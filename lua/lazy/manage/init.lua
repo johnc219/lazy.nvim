@@ -1,6 +1,7 @@
 local Config = require("lazy.core.config")
 local Runner = require("lazy.manage.runner")
 local Plugin = require("lazy.core.plugin")
+local Util = require("lazy.core.util")
 
 local M = {}
 
@@ -196,6 +197,22 @@ function M.clean(opts)
     pipeline = { "fs.clean" },
     plugins = Config.to_clean,
   }, opts):wait(function()
+    ---@type string[]
+    local orphaned_cloning = {}
+
+    Util.ls(Config.options.root, function(fname, name, type)
+      if type == "file" and name:sub(-8) == ".cloning" then
+        name = name:sub(1, -9)
+        if not Config.plugins[name] then
+          orphaned_cloning[#orphaned_cloning + 1] = fname
+        end
+      end
+    end)
+
+    for _, orphaned in ipairs(orphaned_cloning) do
+      vim.loop.fs_unlink(orphaned)
+    end
+
     require("lazy.manage.lock").update()
   end)
 end
